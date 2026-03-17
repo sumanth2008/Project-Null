@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+    
+    function isImmutable(field) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([field]);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['uid', 'email', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             request.resource.data.uid == request.auth.uid &&
+             isValidString('email', 3, 255) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidChat(userId) {
+      return hasRequiredFields(['id', 'userId', 'title', 'createdAt', 'updatedAt']) &&
+             hasOnlyAllowedFields(['id', 'userId', 'title', 'createdAt', 'updatedAt']) &&
+             request.resource.data.userId == userId &&
+             isValidString('id', 1, 100) &&
+             isValidString('title', 0, 255) &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(userId) {
+      return hasRequiredFields(['id', 'chatId', 'userId', 'role', 'text', 'createdAt']) &&
+             hasOnlyAllowedFields(['id', 'chatId', 'userId', 'role', 'text', 'createdAt']) &&
+             request.resource.data.userId == userId &&
+             isValidString('id', 1, 100) &&
+             isValidString('chatId', 1, 100) &&
+             request.resource.data.role in ['user', 'model'] &&
+             isValidString('text', 0, 100000) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidAsset(userId) {
+      return hasRequiredFields(['id', 'userId', 'type', 'url', 'createdAt']) &&
+             hasOnlyAllowedFields(['id', 'userId', 'type', 'url', 'prompt', 'createdAt']) &&
+             request.resource.data.userId == userId &&
+             isValidString('id', 1, 100) &&
+             request.resource.data.type in ['image', 'video', 'audio'] &&
+             isValidString('url', 1, 10000) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidTask(userId) {
+      return hasRequiredFields(['userId', 'title', 'completed', 'createdAt']) &&
+             hasOnlyAllowedFields(['id', 'userId', 'title', 'description', 'dueDate', 'priority', 'completed', 'createdAt', 'updatedAt']) &&
+             request.resource.data.userId == userId &&
+             isValidString('title', 1, 255) &&
+             request.resource.data.completed is bool &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser();
+      allow update: if isOwner(userId) && isValidUser() && isImmutable('uid') && isImmutable('createdAt');
+      allow delete: if isOwner(userId);
+
+      match /chats/{chatId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidChat(userId);
+        allow update: if isOwner(userId) && isValidChat(userId) && isImmutable('id') && isImmutable('userId') && isImmutable('createdAt');
+        allow delete: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidMessage(userId);
+          allow update: if isOwner(userId) && isValidMessage(userId) && isImmutable('id') && isImmutable('chatId') && isImmutable('userId') && isImmutable('createdAt');
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /assets/{assetId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidAsset(userId);
+        allow update: if isOwner(userId) && isValidAsset(userId) && isImmutable('id') && isImmutable('userId') && isImmutable('createdAt');
+        allow delete: if isOwner(userId);
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(userId);
+        allow update: if isOwner(userId) && isValidTask(userId) && isImmutable('id') && isImmutable('userId') && isImmutable('createdAt');
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

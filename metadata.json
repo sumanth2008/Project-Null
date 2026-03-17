@@ -1,0 +1,9 @@
+{
+  "name": "NullMatrix",
+  "description": "Advanced all-in-one intelligent platform combining AI assistance, secure development tools, customizable browser systems, terminal access, and automation capabilities.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
