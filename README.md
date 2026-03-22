@@ -84,7 +84,7 @@ curl -sSL [https://raw.githubusercontent.com/sumanth2008/Project-Null/main/insta
 git clone [https://github.com/sumanth2008/Project-Null.git](https://github.com/sumanth2008/Project-Null.git)
 cd Project-Null
 
-# Initialize environment
+# Initialize environment 
 cp .env.example .env
 
 # Launch services
